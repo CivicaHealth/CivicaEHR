@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}Prescriptions — ClearChart{% endblock %}
+{% block nav_prescriptions %}active{% endblock %}
+{% block topbar_title %}Prescriptions{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>Prescriptions</h1>
+</div>
+
+<!-- Status tabs -->
+<div style="display:flex; gap:2px; margin-bottom:20px; border-bottom:1px solid var(--border);">
+    <a href="{% url 'prescription_list' %}"
+       class="tab-link {% if not status_filter %}tab-active{% endif %}">
+        All <span class="tab-count">{{ counts.all }}</span>
+    </a>
+    <a href="?status=draft"
+       class="tab-link {% if status_filter == 'draft' %}tab-active{% endif %}">
+        Draft <span class="tab-count">{{ counts.draft }}</span>
+    </a>
+    <a href="?status=sent"
+       class="tab-link {% if status_filter == 'sent' %}tab-active{% endif %}">
+        Sent <span class="tab-count">{{ counts.sent }}</span>
+    </a>
+    <a href="?status=cancelled"
+       class="tab-link {% if status_filter == 'cancelled' %}tab-active{% endif %}">
+        Cancelled <span class="tab-count">{{ counts.cancelled }}</span>
+    </a>
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Patient</th>
+                <th>Medication</th>
+                <th>Dosage</th>
+                <th>Frequency</th>
+                <th>Duration</th>
+                <th>Pharmacy</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for rx in prescriptions %}
+            <tr>
+                <td class="font-mono text-sm" style="white-space:nowrap;">
+                    {{ rx.created_at|date:"M d, Y" }}<br>
+                    <span class="text-muted">{{ rx.created_at|time:"g:i A" }}</span>
+                </td>
+
+                <td>
+                    <a href="{% url 'patient_detail' rx.encounter.patient.id %}"
+                       style="color:var(--text); font-weight:500;">
+                        {{ rx.encounter.patient }}
+                    </a><br>
+                    <span style="font-size:11px; color:var(--muted); font-family:'DM Mono',monospace;">#{{ rx.encounter.patient.id }}</span>
+                </td>
+
+                <td style="font-weight:500;">{{ rx.medication_name }}</td>
+                <td class="text-muted text-sm">{{ rx.dosage }}</td>
+                <td class="text-muted text-sm">{{ rx.frequency }}</td>
+                <td class="text-muted text-sm">{{ rx.duration }}</td>
+                <td class="text-muted text-sm">{{ rx.pharmacy|default:"—" }}</td>
+
+                <td>
+                    {% if rx.status == "draft" %}
+                        <span class="badge badge-gray">Draft</span>
+                    {% elif rx.status == "sent" %}
+                        <span class="badge badge-green">Sent</span>
+                    {% elif rx.status == "cancelled" %}
+                        <span class="badge badge-red">Cancelled</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    <a href="{% url 'prescription_edit' rx.id %}?next={{ request.path }}"
+                       class="btn btn-ghost btn-sm">Edit</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9">
+                    <div class="empty-state">
+                        <p>No prescriptions found{% if status_filter %} with status <strong>{{ status_filter }}</strong>{% endif %}.</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .tab-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-decoration: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: color .14s;
+    }
+    .tab-link:hover { color: var(--text); }
+    .tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 18px;
+        padding: 0 5px;
+        background: var(--bg);
+        border-radius: 9px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+    }
+    .tab-active .tab-count { background: var(--accent-light); color: var(--accent); }
+</style>
+
+{% endblock %}

@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}New Patient — ClearChart{% endblock %}
+{% block nav_patients %}active{% endblock %}
+{% block topbar_title %}New Patient{% endblock %}
+
+{% block topbar_actions %}
+    <a href="/" class="btn btn-secondary btn-sm">← Cancel</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 640px;">
+    <div class="page-header">
+        <div>
+            <h1>New Patient</h1>
+            <div class="subtitle">Enter demographic information to create a patient record.</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Patient Information</span>
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap: 0 20px;">
+                    <div class="form-group">
+                        <label class="form-label">First Name</label>
+                        {{ form.first_name }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Last Name</label>
+                        {{ form.last_name }}
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap: 0 20px;">
+                    <div class="form-group">
+                        <label class="form-label">Date of Birth</label>
+                        {{ form.date_of_birth }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Sex</label>
+                        {{ form.sex }}
+                    </div>
+                </div>
+
+                <hr class="section-sep">
+
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap: 0 20px;">
+                    <div class="form-group">
+                        <label class="form-label">Phone</label>
+                        {{ form.phone }}
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Email</label>
+                        {{ form.email }}
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Address</label>
+                    {{ form.address }}
+                </div>
+
+                {% if form.errors %}
+                <div class="message error" style="margin-bottom:16px;">
+                    Please correct the errors below:
+                    {{ form.errors }}
+                </div>
+                {% endif %}
+
+                <div style="display:flex; gap:10px; margin-top:8px;">
+                    <button type="submit" class="btn btn-primary">Save Patient</button>
+                    <a href="/" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

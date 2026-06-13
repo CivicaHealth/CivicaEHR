@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+
+{% block title %}Vitals — ClearChart{% endblock %}
+{% block nav_patients %}active{% endblock %}
+{% block topbar_title %}Vitals{% endblock %}
+
+{% block topbar_actions %}
+    <a href="{% url 'patient_detail' encounter.patient.id %}" class="btn btn-secondary btn-sm">← Patient Chart</a>
+{% endblock %}
+
+{% block content %}
+<div style="max-width: 780px;">
+
+    <!-- Context -->
+    <div class="page-header">
+        <div>
+            <h1>Vitals</h1>
+            <div class="subtitle">
+                {{ encounter.patient }}
+                &nbsp;·&nbsp;
+                {{ encounter.encounter_date|date:"M d, Y" }}
+                &nbsp;·&nbsp;
+                {{ encounter.reason_for_visit }}
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">{% if vital %}Update Vitals{% else %}Enter Vitals{% endif %}</span>
+            {% if vital %}
+                <span class="text-muted text-sm">Last updated {{ vital.created_at|date:"M d, Y g:i A" }}</span>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+
+                <!-- Vitals grid: each measurement in its own labeled cell -->
+                <div class="vitals-grid">
+
+                    <div class="vital-field">
+                        <label class="vital-label">
+                            Blood Pressure
+                            <span class="vital-unit">mmHg</span>
+                        </label>
+                        {{ form.blood_pressure }}
+                    </div>
+
+                    <div class="vital-field">
+                        <label class="vital-label">
+                            Heart Rate
+                            <span class="vital-unit">bpm</span>
+                        </label>
+                        {{ form.heart_rate }}
+                    </div>
+
+                    <div class="vital-field">
+                        <label class="vital-label">
+                            Temperature
+                            <span class="vital-unit">°F</span>
+                        </label>
+                        {{ form.temperature }}
+                    </div>
+
+                    <div class="vital-field">
+                        <label class="vital-label">
+                            Respiratory Rate
+                            <span class="vital-unit">/min</span>
+                        </label>
+                        {{ form.respiratory_rate }}
+                    </div>
+
+                    <div class="vital-field">
+                        <label class="vital-label">
+                            O₂ Saturation
+                            <span class="vital-unit">%</span>
+                        </label>
+                        {{ form.oxygen_saturation }}
+                    </div>
+
+                    <div class="vital-field">
+                        <label class="vital-label">
+                            Weight
+                            <span class="vital-unit">kg</span>
+                        </label>
+                        {{ form.weight_kg }}
+                    </div>
+
+                    <div class="vital-field">
+                        <label class="vital-label">
+                            Height
+                            <span class="vital-unit">cm</span>
+                        </label>
+                        {{ form.height_cm }}
+                    </div>
+
+                    <!-- BMI: calculated client-side, display only -->
+                    <div class="vital-field vital-field--computed">
+                        <label class="vital-label">
+                            BMI
+                            <span class="vital-unit">kg/m²</span>
+                        </label>
+                        <div class="bmi-display" id="bmi-display">—</div>
+                    </div>
+
+                </div>
+
+                {% if form.errors %}
+                <div class="message error" style="margin: 16px 0 0;">{{ form.errors }}</div>
+                {% endif %}
+
+                <div style="display:flex; gap:10px; margin-top:24px; padding-top:20px; border-top:1px solid var(--border);">
+                    <button type="submit" class="btn btn-primary">Save Vitals</button>
+                    <a href="{% url 'patient_detail' encounter.patient.id %}" class="btn btn-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .vitals-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 1px;
+        background: var(--border);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        overflow: hidden;
+    }
+
+    .vital-field {
+        background: var(--surface);
+        padding: 14px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .vital-field--computed {
+        background: #fafbfc;
+    }
+
+    .vital-label {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .5px;
+        color: var(--muted);
+        margin: 0;
+    }
+
+    .vital-unit {
+        font-size: 10px;
+        font-weight: 500;
+        color: #b0bcc9;
+        text-transform: none;
+        letter-spacing: 0;
+    }
+
+    /* Override base input styles inside the grid */
+    .vital-field input {
+        width: 100%;
+        padding: 8px 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        font-family: 'DM Mono', monospace;
+        font-size: 18px;
+        font-weight: 500;
+        color: var(--text);
+        background: var(--surface);
+        outline: none;
+        transition: border-color .14s, box-shadow .14s;
+        /* Remove number spinners */
+        -moz-appearance: textfield;
+    }
+    .vital-field input::-webkit-outer-spin-button,
+    .vital-field input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+    .vital-field input:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px rgba(47,128,237,.12);
+    }
+
+    .bmi-display {
+        font-family: 'DM Mono', monospace;
+        font-size: 18px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        padding: 9px 10px;
+        border: 1px solid transparent;
+        border-radius: var(--radius-sm);
+        background: transparent;
+        min-height: 42px;
+    }
+
+    .bmi-display.bmi-normal   { color: var(--success); }
+    .bmi-display.bmi-warning  { color: var(--warning); }
+    .bmi-display.bmi-danger   { color: var(--danger); }
+</style>
+
+<script>
+    const weightInput = document.getElementById('id_weight_kg');
+    const heightInput = document.getElementById('id_height_cm');
+    const bmiDisplay  = document.getElementById('bmi-display');
+
+    function calcBMI() {
+        const w = parseFloat(weightInput.value);
+        const h = parseFloat(heightInput.value) / 100;
+        if (w > 0 && h > 0) {
+            const bmi = (w / (h * h)).toFixed(1);
+            bmiDisplay.textContent = bmi;
+            bmiDisplay.className = 'bmi-display';
+            if      (bmi < 18.5) bmiDisplay.classList.add('bmi-warning');
+            else if (bmi < 25)   bmiDisplay.classList.add('bmi-normal');
+            else if (bmi < 30)   bmiDisplay.classList.add('bmi-warning');
+            else                 bmiDisplay.classList.add('bmi-danger');
+        } else {
+            bmiDisplay.textContent = '—';
+            bmiDisplay.className = 'bmi-display';
+        }
+    }
+
+    weightInput.addEventListener('input', calcBMI);
+    heightInput.addEventListener('input', calcBMI);
+
+    // Calculate on load if values already exist (edit mode)
+    calcBMI();
+</script>
+
+{% endblock %}

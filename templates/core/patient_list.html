@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Patients — ClearChart{% endblock %}
+{% block nav_patients %}active{% endblock %}
+{% block topbar_title %}Patient Registry{% endblock %}
+
+{% block topbar_actions %}
+    <a href="/patients/new/" class="btn btn-primary btn-sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Patient
+    </a>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1>Patients</h1>
+        <div class="subtitle">{{ patients|length }} record{{ patients|length|pluralize }} found</div>
+    </div>
+    <form method="get" class="search-bar">
+        <div class="search-input-wrap">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" name="q" placeholder="Search by name…" value="{{ request.GET.q }}">
+        </div>
+        <button type="submit" class="btn btn-secondary btn-sm">Search</button>
+    </form>
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Patient</th>
+                <th>DOB</th>
+                <th>Sex</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for patient in patients %}
+            <tr>
+                <td>
+                    <a href="/patients/{{ patient.id }}/" style="font-weight:500; color: var(--text);">
+                        {{ patient.last_name }}, {{ patient.first_name }}
+                    </a><br>
+                    <span style="font-size:11px; color:var(--muted); font-family:'DM Mono',monospace;">#{{ patient.id }}</span>
+                </td>
+                <td class="font-mono text-sm">{{ patient.date_of_birth }}</td>
+                <td>
+                    {% if patient.sex == "male" %}
+                        <span class="badge badge-blue">Male</span>
+                    {% elif patient.sex == "female" %}
+                        <span class="badge badge-gray">Female</span>
+                    {% else %}
+                        <span class="badge badge-gray">{{ patient.sex|capfirst }}</span>
+                    {% endif %}
+                </td>
+                <td class="text-muted font-mono text-sm">{{ patient.phone|default:"—" }}</td>
+                <td class="text-muted text-sm">{{ patient.email|default:"—" }}</td>
+                <td>
+                    <a href="/patients/{{ patient.id }}/" class="btn btn-ghost btn-sm">View →</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">
+                    <div class="empty-state">
+                        <p>No patients found{% if request.GET.q %} matching "<strong>{{ request.GET.q }}</strong>"{% endif %}.</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
