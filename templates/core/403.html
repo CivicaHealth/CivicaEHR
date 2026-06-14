@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Access Denied — ClearChart{% endblock %}
+{% block topbar_title %}Access Denied{% endblock %}
+
+{% block content %}
+<div style="max-width:480px; margin:60px auto; text-align:center;">
+    <div class="card" style="padding:40px 32px;">
+        <div style="font-size:48px; margin-bottom:16px;">🔒</div>
+        <h1 style="font-size:20px; margin-bottom:8px;">Access Denied</h1>
+        <p style="color:var(--text-secondary); font-size:14px; margin-bottom:24px;">
+            Your role does not have permission to access this page.
+            If you believe this is an error, contact your clinic administrator.
+        </p>
+        <a href="/" class="btn btn-primary">← Back to Patients</a>
+    </div>
+</div>
+{% endblock %}

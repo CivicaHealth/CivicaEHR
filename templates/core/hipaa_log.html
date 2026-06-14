@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+
+{% block title %}HIPAA Audit Log — ClearChart{% endblock %}
+{% block nav_users %}active{% endblock %}
+{% block topbar_title %}HIPAA Audit Log{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>HIPAA Audit Log</h1>
+        <div class="subtitle">{{ total }} record{{ total|pluralize }} — read-only</div>
+    </div>
+
+    <form method="get" style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <select name="action" class="form-control" style="width:160px; padding:7px 10px; font-size:13px;">
+            <option value="">All Actions</option>
+            {% for val, label in action_choices %}
+            <option value="{{ val }}" {% if action_filter == val %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+        <input type="text" name="user" placeholder="Filter by username…"
+               value="{{ user_filter }}" style="width:180px; padding:7px 10px; font-size:13px;">
+        <button type="submit" class="btn btn-secondary btn-sm">Filter</button>
+        {% if action_filter or user_filter or patient_filter %}
+            <a href="{% url 'hipaa_log_list' %}" class="btn btn-ghost btn-sm">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Action</th>
+                <th>Model</th>
+                <th>Object</th>
+                <th>Patient</th>
+                <th>IP Address</th>
+                <th>Detail</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for log in page %}
+            <tr>
+                <td class="font-mono text-sm" style="white-space:nowrap;">
+                    {{ log.timestamp|date:"M d, Y" }}<br>
+                    <span class="text-muted">{{ log.timestamp|time:"g:i:s A" }}</span>
+                </td>
+
+                <td class="font-mono text-sm">{{ log.username_snapshot|default:"—" }}</td>
+
+                <td>
+                    {% if log.action == "login_success" %}
+                        <span class="badge badge-green">Login</span>
+                    {% elif log.action == "login_failure" %}
+                        <span class="badge badge-red">Login Failed</span>
+                    {% elif log.action == "logout" %}
+                        <span class="badge badge-gray">Logout</span>
+                    {% elif log.action == "view" %}
+                        <span class="badge badge-blue">View</span>
+                    {% elif log.action == "create" %}
+                        <span class="badge" style="background:#f3e8ff;color:#7e22ce;">Create</span>
+                    {% elif log.action == "update" %}
+                        <span class="badge badge-orange">Update</span>
+                    {% elif log.action == "delete" %}
+                        <span class="badge badge-red">Delete</span>
+                    {% endif %}
+                </td>
+
+                <td class="text-sm text-muted">{{ log.model_name|default:"—" }}</td>
+
+                <td class="text-sm">
+                    {% if log.object_repr %}
+                        <span title="{{ log.object_repr }}">{{ log.object_repr|truncatechars:40 }}</span>
+                    {% else %}—{% endif %}
+                </td>
+
+                <td>
+                    {% if log.patient %}
+                        <a href="{% url 'patient_detail' log.patient.id %}"
+                           style="font-size:12.5px; color:var(--accent);">
+                            {{ log.patient }}
+                        </a>
+                    {% else %}
+                        <span class="text-muted text-sm">—</span>
+                    {% endif %}
+                </td>
+
+                <td class="font-mono text-sm">{{ log.ip_address|default:"—" }}</td>
+
+                <td class="text-muted text-sm">{{ log.extra|truncatechars:60 }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8">
+                    <div class="empty-state"><p>No audit log entries found.</p></div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Pagination -->
+{% if page.has_other_pages %}
+<div style="display:flex; gap:8px; margin-top:16px; align-items:center; justify-content:center;">
+    {% if page.has_previous %}
+        <a href="?page={{ page.previous_page_number }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if user_filter %}&user={{ user_filter }}{% endif %}"
+           class="btn btn-secondary btn-sm">← Prev</a>
+    {% endif %}
+    <span class="text-muted text-sm">Page {{ page.number }} of {{ page.paginator.num_pages }}</span>
+    {% if page.has_next %}
+        <a href="?page={{ page.next_page_number }}{% if action_filter %}&action={{ action_filter }}{% endif %}{% if user_filter %}&user={{ user_filter }}{% endif %}"
+           class="btn btn-secondary btn-sm">Next →</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

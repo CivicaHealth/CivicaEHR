@@ -1,0 +1,1084 @@
+{% extends "base.html" %}
+
+{% block title %}{{ patient }} — ClearChart{% endblock %}
+{% block nav_patients %}active{% endblock %}
+{% block topbar_title %}Patient Chart{% endblock %}
+
+{% block topbar_actions %}
+    <a href="/" class="btn btn-secondary btn-sm">← All Patients</a>
+    <a href="/patients/{{ patient.id }}/encounters/new/" class="btn btn-primary btn-sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        New Encounter
+    </a>
+{% endblock %}
+
+{% block content %}
+
+<!-- Patient header -->
+<div class="page-header" style="margin-bottom:18px;">
+    <div>
+        <h1>{{ patient.first_name }} {{ patient.last_name }}</h1>
+        <div class="subtitle">
+            Patient ID #{{ patient.id }} &nbsp;·&nbsp;
+            DOB {{ patient.date_of_birth }} &nbsp;·&nbsp;
+            {% if patient.sex == "male" %}<span class="badge badge-blue">Male</span>
+            {% elif patient.sex == "female" %}<span class="badge badge-gray">Female</span>
+            {% else %}<span class="badge badge-gray">{{ patient.sex|capfirst }}</span>{% endif %}
+            {% if patient.phone %}&nbsp;·&nbsp; {{ patient.phone }}{% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Two-column layout: sidebar + main -->
+<div class="chart-layout">
+
+    <!-- ── LEFT SIDEBAR ─────────────────────────────────────────────────── -->
+    <div class="chart-sidebar">
+
+        <!-- Allergies -->
+        <div class="card chart-panel" id="allergies-panel">
+            <div class="chart-panel-header">
+                <span class="chart-panel-title">Allergies</span>
+                <button class="panel-add-btn" onclick="openAllergyModal()">+ Add</button>
+            </div>
+            <div class="chart-panel-body" id="allergies-list">
+                {% for allergy in allergies %}
+                <div class="panel-row" data-id="{{ allergy.id }}">
+                    <div class="panel-row-main">
+                        <span class="panel-row-name">{{ allergy.allergen }}</span>
+                        {% if allergy.severity %}
+                            {% if allergy.severity == "severe" or allergy.severity == "Severe" %}
+                                <span class="badge badge-red" style="font-size:10px;">{{ allergy.severity }}</span>
+                            {% elif allergy.severity == "moderate" or allergy.severity == "Moderate" %}
+                                <span class="badge badge-orange" style="font-size:10px;">{{ allergy.severity }}</span>
+                            {% else %}
+                                <span class="badge badge-gray" style="font-size:10px;">{{ allergy.severity }}</span>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    {% if allergy.reaction %}
+                    <div class="panel-row-sub">{{ allergy.reaction }}</div>
+                    {% endif %}
+                    <div class="panel-row-actions">
+                        <button class="panel-row-btn" onclick="openAllergyModal({{ allergy.id }}, '{{ allergy.allergen|escapejs }}', '{{ allergy.reaction|escapejs }}', '{{ allergy.severity|escapejs }}')">Edit</button>
+                        <button class="panel-row-btn danger" onclick="deleteAllergy({{ allergy.id }}, this)">Delete</button>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="panel-empty" id="allergies-empty">No known allergies.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Problems / Medical History -->
+        <div class="card chart-panel" id="problems-panel">
+            <div class="chart-panel-header">
+                <span class="chart-panel-title">Problem List</span>
+                <button class="panel-add-btn" onclick="openProblemModal()">+ Add</button>
+            </div>
+            <!-- Active -->
+            <div class="panel-section-label">Active</div>
+            <div id="problems-active-list">
+                {% for problem in problems %}
+                {% if problem.status == "active" %}
+                <div class="panel-row" data-id="{{ problem.id }}">
+                    <div class="panel-row-main">
+                        <span class="panel-row-name">{{ problem.description }}</span>
+                        {% if problem.icd10_code %}<span class="panel-row-code">{{ problem.icd10_code }}</span>{% endif %}
+                    </div>
+                    {% if problem.onset_date %}
+                    <div class="panel-row-sub">Since {{ problem.onset_date }}</div>
+                    {% endif %}
+                    <div class="panel-row-actions">
+                        <button class="panel-row-btn" onclick="openProblemModal({{ problem.id }}, '{{ problem.icd10_code|escapejs }}', '{{ problem.description|escapejs }}', '{{ problem.status }}', '{{ problem.onset_date|default:'' }}', '{{ problem.resolved_date|default:'' }}')">Edit</button>
+                        <button class="panel-row-btn danger" onclick="deleteProblem({{ problem.id }}, this)">Delete</button>
+                    </div>
+                </div>
+                {% endif %}
+                {% empty %}
+                {% endfor %}
+                {% with active_count=problems|length %}
+                {% if active_count == 0 %}<div class="panel-empty">None.</div>{% endif %}
+                {% endwith %}
+            </div>
+            <!-- Resolved -->
+            <div class="panel-section-label" style="margin-top:8px;">Resolved</div>
+            <div id="problems-resolved-list">
+                {% for problem in problems %}
+                {% if problem.status == "resolved" %}
+                <div class="panel-row" data-id="{{ problem.id }}">
+                    <div class="panel-row-main">
+                        <span class="panel-row-name" style="color:var(--muted); text-decoration:line-through;">{{ problem.description }}</span>
+                        {% if problem.icd10_code %}<span class="panel-row-code">{{ problem.icd10_code }}</span>{% endif %}
+                    </div>
+                    <div class="panel-row-actions">
+                        <button class="panel-row-btn" onclick="openProblemModal({{ problem.id }}, '{{ problem.icd10_code|escapejs }}', '{{ problem.description|escapejs }}', '{{ problem.status }}', '{{ problem.onset_date|default:'' }}', '{{ problem.resolved_date|default:'' }}')">Edit</button>
+                        <button class="panel-row-btn danger" onclick="deleteProblem({{ problem.id }}, this)">Delete</button>
+                    </div>
+                </div>
+                {% endif %}
+                {% empty %}
+                {% endfor %}
+                <div class="panel-empty" id="problems-resolved-empty">None.</div>
+            </div>
+        </div>
+
+        <!-- Social History -->
+        <div class="card chart-panel" id="social-history-panel">
+            <div class="chart-panel-header">
+                <span class="chart-panel-title">Social History</span>
+                <button class="panel-add-btn" onclick="openSocialHistoryModal()">Edit</button>
+            </div>
+            <div class="chart-panel-body">
+                {% if social_history %}
+                    {% if social_history.tobacco_status %}
+                    <div class="panel-row" style="cursor:default;">
+                        <div class="panel-row-main">
+                            <span class="panel-row-code">Tobacco</span>
+                            <span class="panel-row-name">{{ social_history.tobacco_status|capfirst }}</span>
+                        </div>
+                        {% if social_history.tobacco_note %}
+                        <div class="panel-row-sub">{{ social_history.tobacco_note }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if social_history.alcohol_status %}
+                    <div class="panel-row" style="cursor:default;">
+                        <div class="panel-row-main">
+                            <span class="panel-row-code">Alcohol</span>
+                            <span class="panel-row-name">{{ social_history.alcohol_status|capfirst }}</span>
+                        </div>
+                        {% if social_history.alcohol_note %}
+                        <div class="panel-row-sub">{{ social_history.alcohol_note }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if social_history.drug_status %}
+                    <div class="panel-row" style="cursor:default;">
+                        <div class="panel-row-main">
+                            <span class="panel-row-code">Drugs</span>
+                            <span class="panel-row-name">{{ social_history.drug_status|capfirst }}</span>
+                        </div>
+                        {% if social_history.drug_note %}
+                        <div class="panel-row-sub">{{ social_history.drug_note }}</div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    {% if social_history.occupation %}
+                    <div class="panel-row" style="cursor:default;">
+                        <div class="panel-row-main">
+                            <span class="panel-row-code">Occupation</span>
+                            <span class="panel-row-name">{{ social_history.occupation }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if social_history.exercise %}
+                    <div class="panel-row" style="cursor:default;">
+                        <div class="panel-row-main">
+                            <span class="panel-row-code">Exercise</span>
+                            <span class="panel-row-name">{{ social_history.exercise }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if social_history.diet %}
+                    <div class="panel-row" style="cursor:default;">
+                        <div class="panel-row-main">
+                            <span class="panel-row-code">Diet</span>
+                            <span class="panel-row-name">{{ social_history.diet }}</span>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if social_history.notes %}
+                    <div class="panel-row" style="cursor:default;">
+                        <div class="panel-row-sub" style="font-style:italic;">{{ social_history.notes }}</div>
+                    </div>
+                    {% endif %}
+                    {% if not social_history.tobacco_status and not social_history.alcohol_status and not social_history.drug_status and not social_history.occupation and not social_history.exercise and not social_history.diet and not social_history.notes %}
+                    <div class="panel-empty">No social history recorded.</div>
+                    {% endif %}
+                {% else %}
+                    <div class="panel-empty">No social history recorded.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Referrals -->
+        <div class="card chart-panel" id="referrals-panel">
+            <div class="chart-panel-header">
+                <span class="chart-panel-title">Referrals</span>
+                <a href="{% url 'referral_create' patient.id %}" class="panel-add-btn">+ Add</a>
+            </div>
+            <div class="chart-panel-body">
+                {% for referral in patient.referrals.all %}
+                <div class="panel-row">
+                    <div class="panel-row-main">
+                        <span class="panel-row-name">{{ referral.specialist_name }}</span>
+                        {% if referral.status == "pending" %}
+                        <span class="badge badge-gray" style="font-size:10px;">Pending</span>
+                        {% elif referral.status == "sent" %}
+                        <span class="badge badge-blue" style="font-size:10px;">Sent</span>
+                        {% elif referral.status == "completed" %}
+                        <span class="badge badge-green" style="font-size:10px;">Completed</span>
+                        {% elif referral.status == "cancelled" %}
+                        <span class="badge badge-red" style="font-size:10px;">Cancelled</span>
+                        {% endif %}
+                    </div>
+                    {% if referral.specialty %}
+                    <div class="panel-row-sub">{{ referral.specialty }}</div>
+                    {% endif %}
+                    <div class="panel-row-actions">
+                        <a href="{% url 'referral_edit' referral.id %}" class="panel-row-btn">Edit</a>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="panel-empty">No referrals.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ── MAIN CONTENT ──────────────────────────────────────────────────── -->
+    <div class="chart-main">
+
+        <!-- Encounters -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Encounters</span>
+                <a href="/patients/{{ patient.id }}/encounters/new/" class="btn btn-ghost btn-sm">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    New Encounter
+                </a>
+            </div>
+
+            {% for encounter in encounters %}
+            <div class="encounter-block" id="encounter-{{ encounter.id }}">
+                <!-- Encounter header row -->
+                <div class="encounter-header">
+                    <div class="encounter-meta">
+                        <span class="encounter-date font-mono">{{ encounter.encounter_date|date:"M d, Y" }}</span>
+                        <span class="encounter-time text-muted">{{ encounter.encounter_date|time:"g:i A" }}</span>
+                        <span class="encounter-reason">{{ encounter.reason_for_visit }}</span>
+                    </div>
+                    <div class="encounter-actions">
+                        <a href="{% url 'vitals_edit' encounter.id %}" class="enc-action-btn">
+                            {% with vital=encounter.vitals.first %}{% if vital %}Vitals ✓{% else %}+ Vitals{% endif %}{% endwith %}
+                        </a>
+                        <a href="{% url 'soap_note_edit' encounter.id %}" class="enc-action-btn">
+                            {% if encounter.soap_note %}SOAP ✓{% else %}+ SOAP{% endif %}
+                        </a>
+                        <a href="{% url 'lab_order_create' encounter.id %}" class="enc-action-btn">+ Lab</a>
+                        <a href="{% url 'prescription_create' encounter.id %}" class="enc-action-btn">+ Rx</a>
+                    </div>
+                </div>
+
+                <!-- Vitals summary -->
+                {% with vital=encounter.vitals.first %}
+                {% if vital %}
+                <div class="enc-section">
+                    <div class="enc-section-label">Vitals</div>
+                    <div class="vitals-row">
+                        {% if vital.blood_pressure %}<div class="vital-stat"><span class="vital-val">{{ vital.blood_pressure }}</span><span class="vital-unit">mmHg</span></div>{% endif %}
+                        {% if vital.heart_rate %}<div class="vital-stat"><span class="vital-val">{{ vital.heart_rate }}</span><span class="vital-unit">bpm</span></div>{% endif %}
+                        {% if vital.temperature %}<div class="vital-stat"><span class="vital-val">{{ vital.temperature }}</span><span class="vital-unit">°F</span></div>{% endif %}
+                        {% if vital.respiratory_rate %}<div class="vital-stat"><span class="vital-val">{{ vital.respiratory_rate }}</span><span class="vital-unit">/min</span></div>{% endif %}
+                        {% if vital.oxygen_saturation %}<div class="vital-stat"><span class="vital-val">{{ vital.oxygen_saturation }}%</span><span class="vital-unit">O₂</span></div>{% endif %}
+                        {% if vital.weight_kg %}<div class="vital-stat"><span class="vital-val">{{ vital.weight_kg }}</span><span class="vital-unit">kg</span></div>{% endif %}
+                        {% if vital.height_cm %}<div class="vital-stat"><span class="vital-val">{{ vital.height_cm }}</span><span class="vital-unit">cm</span></div>{% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <!-- Diagnoses -->
+                <div class="enc-section">
+                    <div class="enc-section-label">
+                        Diagnoses
+                        <button class="enc-inline-add" onclick="openDiagnosisModal({{ encounter.id }})">+ Add</button>
+                    </div>
+                    <div id="diagnoses-{{ encounter.id }}">
+                        {% for dx in encounter.diagnoses.all %}
+                        <div class="enc-item" data-id="{{ dx.id }}">
+                            <span class="enc-item-code">{{ dx.icd10_code }}</span>
+                            <span class="enc-item-name">{{ dx.description }}</span>
+                            <button class="enc-item-edit" onclick="openDiagnosisModal({{ encounter.id }}, {{ dx.id }}, '{{ dx.icd10_code|escapejs }}', '{{ dx.description|escapejs }}')">Edit</button>
+                            <button class="enc-item-del" onclick="deleteDiagnosis({{ dx.id }}, this)">×</button>
+                        </div>
+                        {% empty %}
+                        <span class="enc-item-empty">None recorded.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Medications -->
+                <div class="enc-section">
+                    <div class="enc-section-label">
+                        Medications
+                        <button class="enc-inline-add" onclick="openMedicationModal({{ encounter.id }})">+ Add</button>
+                    </div>
+                    <div id="medications-{{ encounter.id }}">
+                        {% for med in encounter.medications.all %}
+                        <div class="enc-item" data-id="{{ med.id }}">
+                            <span class="enc-item-name" style="font-weight:500;">{{ med.name }}</span>
+                            {% if med.dosage %}<span class="enc-item-code">{{ med.dosage }}</span>{% endif %}
+                            {% if med.instructions %}<span class="enc-item-sub">{{ med.instructions }}</span>{% endif %}
+                            <button class="enc-item-edit" onclick="openMedicationModal({{ encounter.id }}, {{ med.id }}, '{{ med.name|escapejs }}', '{{ med.dosage|escapejs }}', '{{ med.instructions|escapejs }}')">Edit</button>
+                            <button class="enc-item-del" onclick="deleteMedication({{ med.id }}, this)">×</button>
+                        </div>
+                        {% empty %}
+                        <span class="enc-item-empty">None recorded.</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Labs -->
+                {% with labs=encounter.lab_orders.all %}
+                {% if labs %}
+                <div class="enc-section">
+                    <div class="enc-section-label">Labs</div>
+                    <div style="display:flex; flex-wrap:wrap; gap:4px;">
+                        {% for lab in labs %}
+                        <a href="{% url 'lab_order_edit' lab.id %}?next={{ request.path }}" style="text-decoration:none;">
+                            {% if lab.status == "completed" %}<span class="badge badge-green">{{ lab.test_name }}</span>
+                            {% elif lab.status == "cancelled" %}<span class="badge badge-gray">{{ lab.test_name }}</span>
+                            {% else %}<span class="badge badge-blue">{{ lab.test_name }}</span>{% endif %}
+                        </a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endwith %}
+
+                <!-- SOAP preview -->
+                {% if encounter.soap_note %}
+                <div class="enc-section">
+                    <div class="enc-section-label">
+                        SOAP Note
+                        <a href="{% url 'soap_note_edit' encounter.id %}" class="enc-inline-add">Edit</a>
+                    </div>
+                    {% if encounter.soap_note.subjective %}
+                    <div class="soap-preview"><span class="soap-label">S</span> {{ encounter.soap_note.subjective|truncatechars:120 }}</div>
+                    {% endif %}
+                    {% if encounter.soap_note.objective %}
+                    <div class="soap-preview"><span class="soap-label">O</span> {{ encounter.soap_note.objective|truncatechars:120 }}</div>
+                    {% endif %}
+                    {% if encounter.soap_note.assessment %}
+                    <div class="soap-preview"><span class="soap-label">A</span> {{ encounter.soap_note.assessment|truncatechars:120 }}</div>
+                    {% endif %}
+                    {% if encounter.soap_note.plan %}
+                    <div class="soap-preview"><span class="soap-label">P</span> {{ encounter.soap_note.plan|truncatechars:120 }}</div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
+            </div>
+            {% empty %}
+            <div class="empty-state" style="padding:32px;">
+                <p>No encounters recorded yet.</p>
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+</div>
+
+<!-- ── MODALS ────────────────────────────────────────────────────────────── -->
+
+<!-- Allergy Modal -->
+<div id="allergy-modal" class="mini-modal-overlay" style="display:none;">
+    <div class="mini-modal">
+        <div class="mini-modal-header">
+            <span id="allergy-modal-title">Add Allergy</span>
+            <button onclick="closeMiniModal('allergy-modal')" class="modal-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="mini-modal-body">
+            <input type="hidden" id="allergy-id">
+            <div class="form-group">
+                <label class="form-label">Allergen</label>
+                <input type="text" id="allergy-allergen" class="form-control" placeholder="e.g. Penicillin">
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">
+                <div class="form-group">
+                    <label class="form-label">Reaction</label>
+                    <input type="text" id="allergy-reaction" class="form-control" placeholder="e.g. Hives">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Severity</label>
+                    <select id="allergy-severity" class="form-control">
+                        <option value="">Unknown</option>
+                        <option value="Mild">Mild</option>
+                        <option value="Moderate">Moderate</option>
+                        <option value="Severe">Severe</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        <div class="mini-modal-footer">
+            <button class="btn btn-primary btn-sm" onclick="saveAllergy()">Save</button>
+            <button class="btn btn-secondary btn-sm" onclick="closeMiniModal('allergy-modal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Problem Modal -->
+<div id="problem-modal" class="mini-modal-overlay" style="display:none;">
+    <div class="mini-modal">
+        <div class="mini-modal-header">
+            <span id="problem-modal-title">Add Problem</span>
+            <button onclick="closeMiniModal('problem-modal')" class="modal-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="mini-modal-body">
+            <input type="hidden" id="problem-id">
+            <div style="display:grid; grid-template-columns:130px 1fr; gap:0 14px;">
+                <div class="form-group">
+                    <label class="form-label">ICD-10 Code</label>
+                    <input type="text" id="problem-icd10" class="form-control" placeholder="e.g. E11.9">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" id="problem-description" class="form-control" placeholder="e.g. Type 2 Diabetes">
+                </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 14px;">
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="problem-status" class="form-control">
+                        <option value="active">Active</option>
+                        <option value="resolved">Resolved</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Onset Date</label>
+                    <input type="date" id="problem-onset" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Resolved Date</label>
+                    <input type="date" id="problem-resolved" class="form-control">
+                </div>
+            </div>
+        </div>
+        <div class="mini-modal-footer">
+            <button class="btn btn-primary btn-sm" onclick="saveProblem()">Save</button>
+            <button class="btn btn-secondary btn-sm" onclick="closeMiniModal('problem-modal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Diagnosis Modal -->
+<div id="diagnosis-modal" class="mini-modal-overlay" style="display:none;">
+    <div class="mini-modal">
+        <div class="mini-modal-header">
+            <span id="diagnosis-modal-title">Add Diagnosis</span>
+            <button onclick="closeMiniModal('diagnosis-modal')" class="modal-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="mini-modal-body">
+            <input type="hidden" id="diagnosis-id">
+            <input type="hidden" id="diagnosis-encounter-id">
+            <div style="display:grid; grid-template-columns:130px 1fr; gap:0 14px;">
+                <div class="form-group">
+                    <label class="form-label">ICD-10 Code</label>
+                    <input type="text" id="diagnosis-icd10" class="form-control" placeholder="e.g. J06.9">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <input type="text" id="diagnosis-description" class="form-control" placeholder="e.g. Upper respiratory infection">
+                </div>
+            </div>
+        </div>
+        <div class="mini-modal-footer">
+            <button class="btn btn-primary btn-sm" onclick="saveDiagnosis()">Save</button>
+            <button class="btn btn-secondary btn-sm" onclick="closeMiniModal('diagnosis-modal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<!-- Medication Modal -->
+<div id="medication-modal" class="mini-modal-overlay" style="display:none;">
+    <div class="mini-modal">
+        <div class="mini-modal-header">
+            <span id="medication-modal-title">Add Medication</span>
+            <button onclick="closeMiniModal('medication-modal')" class="modal-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="mini-modal-body">
+            <input type="hidden" id="medication-id">
+            <input type="hidden" id="medication-encounter-id">
+            <div class="form-group">
+                <label class="form-label">Medication Name</label>
+                <input type="text" id="medication-name" class="form-control" placeholder="e.g. Amoxicillin">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Dosage</label>
+                <input type="text" id="medication-dosage" class="form-control" placeholder="e.g. 500mg twice daily">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Instructions</label>
+                <input type="text" id="medication-instructions" class="form-control" placeholder="e.g. Take with food for 10 days">
+            </div>
+        </div>
+        <div class="mini-modal-footer">
+            <button class="btn btn-primary btn-sm" onclick="saveMedication()">Save</button>
+            <button class="btn btn-secondary btn-sm" onclick="closeMiniModal('medication-modal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<style>
+/* ── Two-column chart layout ── */
+.chart-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+/* ── Sidebar panels ── */
+.chart-panel { margin-bottom: 16px; }
+.chart-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+    border-radius: var(--radius) var(--radius) 0 0;
+}
+.chart-panel-title {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--text-secondary);
+}
+.panel-add-btn {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: inherit;
+}
+.panel-add-btn:hover { background: var(--accent-light); }
+
+.panel-section-label {
+    padding: 6px 16px 2px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .6px;
+    color: var(--muted);
+}
+
+.panel-row {
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--border);
+}
+.panel-row:last-child { border-bottom: none; }
+.panel-row:hover { background: #fafbfc; }
+
+.panel-row-main {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+.panel-row-name { font-size: 13px; font-weight: 500; color: var(--text); }
+.panel-row-code {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+}
+.panel-row-sub { font-size: 11.5px; color: var(--text-secondary); margin-top: 1px; }
+.panel-row-actions { display: none; gap: 6px; margin-top: 4px; }
+.panel-row:hover .panel-row-actions { display: flex; }
+.panel-row-btn {
+    font-size: 11px;
+    font-family: inherit;
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 8px;
+    cursor: pointer;
+    color: var(--text-secondary);
+}
+.panel-row-btn:hover { background: var(--bg); color: var(--text); }
+.panel-row-btn.danger:hover { color: var(--danger); border-color: var(--danger); }
+.panel-empty { padding: 10px 16px; font-size: 12.5px; color: var(--muted); }
+
+/* ── Encounter blocks ── */
+.encounter-block {
+    border-bottom: 1px solid var(--border);
+    padding: 0;
+}
+.encounter-block:last-child { border-bottom: none; }
+
+.encounter-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    background: #fafbfc;
+    gap: 16px;
+}
+.encounter-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.encounter-date { font-size: 13px; font-weight: 600; color: var(--text); }
+.encounter-time { font-size: 12px; }
+.encounter-reason { font-size: 13px; color: var(--text-secondary); }
+.encounter-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.enc-action-btn {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 10px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all .13s;
+}
+.enc-action-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+.enc-section {
+    padding: 10px 20px;
+    border-top: 1px solid var(--border);
+}
+.enc-section-label {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.enc-inline-add {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0;
+    text-decoration: none;
+}
+.enc-inline-add:hover { text-decoration: underline; }
+
+.enc-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+    flex-wrap: wrap;
+}
+.enc-item-code {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 1px 5px;
+    white-space: nowrap;
+}
+.enc-item-name { font-size: 13px; color: var(--text); }
+.enc-item-sub  { font-size: 12px; color: var(--text-secondary); }
+.enc-item-edit {
+    font-size: 11px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    padding: 0 4px;
+    margin-left: auto;
+}
+.enc-item-edit:hover { color: var(--accent); }
+.enc-item-del {
+    font-size: 14px;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0 2px;
+    line-height: 1;
+}
+.enc-item-del:hover { color: var(--danger); }
+.enc-item-empty { font-size: 12.5px; color: var(--muted); }
+
+/* Vitals row */
+.vitals-row { display: flex; flex-wrap: wrap; gap: 16px; }
+.vital-stat  { display: flex; flex-direction: column; align-items: center; }
+.vital-val   { font-family: 'DM Mono', monospace; font-size: 16px; font-weight: 600; color: var(--text); line-height: 1; }
+.vital-unit  { font-size: 10px; color: var(--muted); margin-top: 2px; }
+
+/* SOAP preview */
+.soap-preview {
+    display: flex;
+    gap: 8px;
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+    line-height: 1.5;
+}
+.soap-label {
+    flex-shrink: 0;
+    font-weight: 700;
+    font-size: 11px;
+    color: var(--muted);
+    width: 14px;
+    padding-top: 2px;
+}
+
+/* ── Mini modals ── */
+.mini-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.3);
+    z-index: 200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+.mini-modal {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0,0,0,.16);
+    width: 100%;
+    max-width: 460px;
+    animation: modal-in .14s ease;
+}
+@keyframes modal-in {
+    from { opacity:0; transform: translateY(-6px) scale(.98); }
+    to   { opacity:1; transform: none; }
+}
+.mini-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+}
+.mini-modal-body  { padding: 16px 18px; }
+.mini-modal-footer {
+    display: flex;
+    gap: 8px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+}
+.mini-modal-body .form-group { margin-bottom: 12px; }
+.mini-modal-body .form-group:last-child { margin-bottom: 0; }
+</style>
+
+
+<!-- Social History Modal -->
+<div id="social-history-modal" class="mini-modal-overlay" style="display:none;">
+    <div class="mini-modal" style="max-width:520px;">
+        <div class="mini-modal-header">
+            <span>Social History</span>
+            <button onclick="closeMiniModal('social-history-modal')" class="modal-close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:16px;height:16px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="mini-modal-body">
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">
+                <div class="form-group">
+                    <label class="form-label">Tobacco</label>
+                    <select id="sh-tobacco-status" class="form-control">
+                        <option value="">— Select —</option>
+                        <option value="never">Never</option>
+                        <option value="former">Former</option>
+                        <option value="current">Current</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Tobacco Note</label>
+                    <input type="text" id="sh-tobacco-note" class="form-control" placeholder="e.g. 1 PPD for 10 years">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">
+                <div class="form-group">
+                    <label class="form-label">Alcohol</label>
+                    <select id="sh-alcohol-status" class="form-control">
+                        <option value="">— Select —</option>
+                        <option value="never">Never</option>
+                        <option value="occasional">Occasional</option>
+                        <option value="moderate">Moderate</option>
+                        <option value="heavy">Heavy</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Alcohol Note</label>
+                    <input type="text" id="sh-alcohol-note" class="form-control" placeholder="e.g. 2 drinks/week">
+                </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">
+                <div class="form-group">
+                    <label class="form-label">Recreational Drugs</label>
+                    <select id="sh-drug-status" class="form-control">
+                        <option value="">— Select —</option>
+                        <option value="never">Never</option>
+                        <option value="former">Former</option>
+                        <option value="current">Current</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Drug Note</label>
+                    <input type="text" id="sh-drug-note" class="form-control" placeholder="Optional details">
+                </div>
+            </div>
+
+            <hr class="section-sep" style="margin:12px 0;">
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 14px;">
+                <div class="form-group">
+                    <label class="form-label">Occupation</label>
+                    <input type="text" id="sh-occupation" class="form-control" placeholder="e.g. Teacher">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Exercise</label>
+                    <input type="text" id="sh-exercise" class="form-control" placeholder="e.g. 3x/week">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Diet</label>
+                <input type="text" id="sh-diet" class="form-control" placeholder="e.g. Vegetarian">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Additional Notes</label>
+                <textarea id="sh-notes" class="form-control" rows="2" placeholder="Other relevant social history…"></textarea>
+            </div>
+
+        </div>
+        <div class="mini-modal-footer">
+            <button class="btn btn-primary btn-sm" onclick="saveSocialHistory()">Save</button>
+            <button class="btn btn-secondary btn-sm" onclick="closeMiniModal('social-history-modal')">Cancel</button>
+        </div>
+    </div>
+</div>
+
+<script>
+const CSRF       = '{{ csrf_token }}';
+const PATIENT_ID = {{ patient.id }};
+
+/* ── Helpers ── */
+function closeMiniModal(id) {
+    document.getElementById(id).style.display = 'none';
+}
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.mini-modal-overlay').forEach(m => m.style.display = 'none');
+    }
+});
+document.querySelectorAll('.mini-modal-overlay').forEach(overlay => {
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.style.display = 'none'; });
+});
+
+async function post(url, data) {
+    const r = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify(data),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+}
+
+/* ── Allergies ── */
+function openAllergyModal(id='', allergen='', reaction='', severity='') {
+    document.getElementById('allergy-id').value        = id;
+    document.getElementById('allergy-allergen').value  = allergen;
+    document.getElementById('allergy-reaction').value  = reaction;
+    document.getElementById('allergy-severity').value  = severity;
+    document.getElementById('allergy-modal-title').textContent = id ? 'Edit Allergy' : 'Add Allergy';
+    document.getElementById('allergy-modal').style.display = 'flex';
+    document.getElementById('allergy-allergen').focus();
+}
+
+async function saveAllergy() {
+    const id       = document.getElementById('allergy-id').value;
+    const allergen = document.getElementById('allergy-allergen').value.trim();
+    if (!allergen) { document.getElementById('allergy-allergen').focus(); return; }
+
+    const data = await post(`/patients/${PATIENT_ID}/allergies/save/`, {
+        id: id || undefined,
+        allergen,
+        reaction: document.getElementById('allergy-reaction').value,
+        severity: document.getElementById('allergy-severity').value,
+    });
+    closeMiniModal('allergy-modal');
+    location.reload();
+}
+
+async function deleteAllergy(id, btn) {
+    if (!confirm('Delete this allergy?')) return;
+    await post(`/allergies/${id}/delete/`, {});
+    btn.closest('.panel-row').remove();
+}
+
+/* ── Problems ── */
+function openProblemModal(id='', icd10='', description='', status='active', onset='', resolved='') {
+    document.getElementById('problem-id').value          = id;
+    document.getElementById('problem-icd10').value       = icd10;
+    document.getElementById('problem-description').value = description;
+    document.getElementById('problem-status').value      = status;
+    document.getElementById('problem-onset').value       = onset;
+    document.getElementById('problem-resolved').value    = resolved;
+    document.getElementById('problem-modal-title').textContent = id ? 'Edit Problem' : 'Add Problem';
+    document.getElementById('problem-modal').style.display = 'flex';
+    document.getElementById('problem-description').focus();
+}
+
+async function saveProblem() {
+    const description = document.getElementById('problem-description').value.trim();
+    if (!description) { document.getElementById('problem-description').focus(); return; }
+
+    await post(`/patients/${PATIENT_ID}/problems/save/`, {
+        id:            document.getElementById('problem-id').value || undefined,
+        icd10_code:    document.getElementById('problem-icd10').value,
+        description,
+        status:        document.getElementById('problem-status').value,
+        onset_date:    document.getElementById('problem-onset').value || null,
+        resolved_date: document.getElementById('problem-resolved').value || null,
+    });
+    closeMiniModal('problem-modal');
+    location.reload();
+}
+
+async function deleteProblem(id, btn) {
+    if (!confirm('Delete this problem?')) return;
+    await post(`/problems/${id}/delete/`, {});
+    btn.closest('.panel-row').remove();
+}
+
+/* ── Diagnoses ── */
+function openDiagnosisModal(encounterId, id='', icd10='', description='') {
+    document.getElementById('diagnosis-encounter-id').value = encounterId;
+    document.getElementById('diagnosis-id').value           = id;
+    document.getElementById('diagnosis-icd10').value        = icd10;
+    document.getElementById('diagnosis-description').value  = description;
+    document.getElementById('diagnosis-modal-title').textContent = id ? 'Edit Diagnosis' : 'Add Diagnosis';
+    document.getElementById('diagnosis-modal').style.display = 'flex';
+    document.getElementById('diagnosis-icd10').focus();
+}
+
+async function saveDiagnosis() {
+    const encId       = document.getElementById('diagnosis-encounter-id').value;
+    const description = document.getElementById('diagnosis-description').value.trim();
+    if (!description) { document.getElementById('diagnosis-description').focus(); return; }
+
+    await post(`/encounters/${encId}/diagnoses/save/`, {
+        id:          document.getElementById('diagnosis-id').value || undefined,
+        icd10_code:  document.getElementById('diagnosis-icd10').value,
+        description,
+    });
+    closeMiniModal('diagnosis-modal');
+    location.reload();
+}
+
+async function deleteDiagnosis(id, btn) {
+    if (!confirm('Delete this diagnosis?')) return;
+    await post(`/diagnoses/${id}/delete/`, {});
+    btn.closest('.enc-item').remove();
+}
+
+/* ── Social History ── */
+function openSocialHistoryModal() {
+    {% if social_history %}
+    document.getElementById('sh-tobacco-status').value  = '{{ social_history.tobacco_status }}';
+    document.getElementById('sh-tobacco-note').value    = '{{ social_history.tobacco_note|escapejs }}';
+    document.getElementById('sh-alcohol-status').value  = '{{ social_history.alcohol_status }}';
+    document.getElementById('sh-alcohol-note').value    = '{{ social_history.alcohol_note|escapejs }}';
+    document.getElementById('sh-drug-status').value     = '{{ social_history.drug_status }}';
+    document.getElementById('sh-drug-note').value       = '{{ social_history.drug_note|escapejs }}';
+    document.getElementById('sh-occupation').value      = '{{ social_history.occupation|escapejs }}';
+    document.getElementById('sh-exercise').value        = '{{ social_history.exercise|escapejs }}';
+    document.getElementById('sh-diet').value            = '{{ social_history.diet|escapejs }}';
+    document.getElementById('sh-notes').value           = '{{ social_history.notes|escapejs }}';
+    {% endif %}
+    document.getElementById('social-history-modal').style.display = 'flex';
+}
+
+async function saveSocialHistory() {
+    await post(`/patients/${PATIENT_ID}/social-history/save/`, {
+        tobacco_status: document.getElementById('sh-tobacco-status').value,
+        tobacco_note:   document.getElementById('sh-tobacco-note').value,
+        alcohol_status: document.getElementById('sh-alcohol-status').value,
+        alcohol_note:   document.getElementById('sh-alcohol-note').value,
+        drug_status:    document.getElementById('sh-drug-status').value,
+        drug_note:      document.getElementById('sh-drug-note').value,
+        occupation:     document.getElementById('sh-occupation').value,
+        exercise:       document.getElementById('sh-exercise').value,
+        diet:           document.getElementById('sh-diet').value,
+        notes:          document.getElementById('sh-notes').value,
+    });
+    closeMiniModal('social-history-modal');
+    location.reload();
+}
+
+/* ── Medications ── */
+function openMedicationModal(encounterId, id='', name='', dosage='', instructions='') {
+    document.getElementById('medication-encounter-id').value = encounterId;
+    document.getElementById('medication-id').value           = id;
+    document.getElementById('medication-name').value         = name;
+    document.getElementById('medication-dosage').value       = dosage;
+    document.getElementById('medication-instructions').value = instructions;
+    document.getElementById('medication-modal-title').textContent = id ? 'Edit Medication' : 'Add Medication';
+    document.getElementById('medication-modal').style.display = 'flex';
+    document.getElementById('medication-name').focus();
+}
+
+async function saveMedication() {
+    const encId = document.getElementById('medication-encounter-id').value;
+    const name  = document.getElementById('medication-name').value.trim();
+    if (!name) { document.getElementById('medication-name').focus(); return; }
+
+    await post(`/encounters/${encId}/medications/save/`, {
+        id:           document.getElementById('medication-id').value || undefined,
+        name,
+        dosage:       document.getElementById('medication-dosage').value,
+        instructions: document.getElementById('medication-instructions').value,
+    });
+    closeMiniModal('medication-modal');
+    location.reload();
+}
+
+async function deleteMedication(id, btn) {
+    if (!confirm('Delete this medication?')) return;
+    await post(`/medications/${id}/delete/`, {});
+    btn.closest('.enc-item').remove();
+}
+</script>
+
+{% endblock %}

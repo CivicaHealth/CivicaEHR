@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard — ClearChart{% endblock %}
+{% block nav_dashboard %}active{% endblock %}
+{% block topbar_title %}Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>Overview</h1>
+        <div class="subtitle">Practice summary at a glance.</div>
+    </div>
+</div>
+
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Patients</div>
+        <div class="stat-value">{{ patient_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Appointments</div>
+        <div class="stat-value">{{ appointment_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Encounters</div>
+        <div class="stat-value">{{ encounter_count }}</div>
+    </div>
+</div>
+
+<div class="card" style="max-width: 520px;">
+    <div class="card-header">
+        <span class="card-title">Recently Added Patients</span>
+        <a href="/" class="btn btn-ghost btn-sm">View all →</a>
+    </div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Patient</th>
+                <th>Added</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for patient in recent_patients %}
+            <tr>
+                <td>
+                    <a href="/patients/{{ patient.id }}/">{{ patient }}</a>
+                </td>
+                <td class="text-muted text-sm font-mono">{{ patient.created_at|date:"M d, Y" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="2">
+                    <div class="empty-state"><p>No patients yet.</p></div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

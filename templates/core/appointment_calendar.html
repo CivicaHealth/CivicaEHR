@@ -1,0 +1,511 @@
+{% extends "base.html" %}
+
+{% block title %}Schedule Appointment — ClearChart{% endblock %}
+{% block nav_appointments %}{% endblock %}
+{% block topbar_title %}Schedule Appointment{% endblock %}
+
+{% block content %}
+
+<!-- FullCalendar CSS + JS from CDN -->
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+
+<div id="calendar-wrap">
+    <div id="calendar"></div>
+</div>
+
+<!-- Schedule / Edit Modal -->
+<div id="appt-modal-overlay" class="modal-overlay" style="display:none;">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title" id="modal-title">Schedule Appointment</span>
+            <button class="modal-close" id="modal-close-btn" type="button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div class="modal-body">
+            <input type="hidden" id="modal-appt-id" value="">
+            <input type="hidden" id="modal-appt-date" value="">
+
+            <div class="form-group">
+                <label class="form-label">Patient</label>
+                <select id="modal-patient" class="form-control">
+                    <option value="">— Select patient —</option>
+                    {% for patient in patients %}
+                    <option value="{{ patient.id }}">{{ patient }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 16px;">
+                <div class="form-group">
+                    <label class="form-label">Date & Time</label>
+                    <input type="datetime-local" id="modal-datetime" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Duration</label>
+                    <select id="modal-duration" class="form-control">
+                        <option value="10">10 min</option>
+                        <option value="15">15 min</option>
+                        <option value="30" selected>30 min</option>
+                        <option value="45">45 min</option>
+                        <option value="60">1 hour</option>
+                        <option value="90">1 hr 30 min</option>
+                        <option value="120">2 hours</option>
+                        <option value="180">3 hours</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Reason for Visit</label>
+                <input type="text" id="modal-reason" class="form-control" placeholder="e.g. Annual physical">
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 16px;">
+                <div class="form-group">
+                    <label class="form-label">Status</label>
+                    <select id="modal-status" class="form-control">
+                        <option value="scheduled">Scheduled</option>
+                        <option value="arrived">Arrived</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="no_show">No Show</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea id="modal-notes" class="form-control" rows="2" placeholder="Optional notes…"></textarea>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <div style="display:flex; gap:8px; align-items:center; justify-content:space-between; width:100%;">
+                <div style="display:flex; gap:8px;">
+                    <button class="btn btn-primary" id="modal-save-btn" type="button">Schedule</button>
+                    <button class="btn btn-secondary" id="modal-cancel-btn" type="button">Cancel</button>
+                </div>
+                <button class="btn" id="modal-delete-btn" type="button"
+                        style="display:none; color:var(--danger); border-color:transparent; background:none; padding:6px 10px;">
+                    Delete
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Calendar container */
+    #calendar-wrap {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        padding: 20px;
+    }
+
+    /* FullCalendar overrides */
+    .fc {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 13px;
+    }
+
+    .fc .fc-toolbar-title {
+        font-size: 16px;
+        font-weight: 600;
+        color: var(--text);
+    }
+
+    .fc .fc-button {
+        font-family: 'DM Sans', sans-serif;
+        font-size: 12.5px;
+        font-weight: 500;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        color: var(--text-secondary);
+        box-shadow: none;
+        padding: 6px 13px;
+        border-radius: var(--radius-sm) !important;
+        transition: all .14s;
+    }
+
+    .fc .fc-button:hover,
+    .fc .fc-button:focus {
+        background: var(--bg);
+        color: var(--text);
+        border-color: #c5cdd8;
+        box-shadow: none !important;
+        outline: none;
+    }
+
+    .fc .fc-button-primary:not(:disabled).fc-button-active,
+    .fc .fc-button-primary:not(:disabled):active {
+        background: var(--accent) !important;
+        border-color: var(--accent) !important;
+        color: #fff !important;
+        box-shadow: none !important;
+    }
+
+    .fc .fc-button-group .fc-button { border-radius: 0 !important; }
+    .fc .fc-button-group .fc-button:first-child { border-radius: var(--radius-sm) 0 0 var(--radius-sm) !important; }
+    .fc .fc-button-group .fc-button:last-child  { border-radius: 0 var(--radius-sm) var(--radius-sm) 0 !important; }
+
+    .fc .fc-today-button {
+        border-radius: var(--radius-sm) !important;
+    }
+
+    .fc-theme-standard td,
+    .fc-theme-standard th,
+    .fc-theme-standard .fc-scrollgrid {
+        border-color: var(--border);
+    }
+
+    .fc .fc-col-header-cell-cushion {
+        font-size: 11.5px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        color: var(--muted);
+        text-decoration: none;
+        padding: 8px 4px;
+    }
+
+    .fc .fc-daygrid-day-number {
+        font-size: 12.5px;
+        color: var(--text-secondary);
+        text-decoration: none;
+        padding: 6px 8px;
+    }
+
+    .fc .fc-day-today {
+        background: #f0f6ff !important;
+    }
+
+    .fc .fc-day-today .fc-daygrid-day-number {
+        color: var(--accent);
+        font-weight: 700;
+    }
+
+    .fc .fc-timegrid-slot-label-cushion {
+        font-size: 11px;
+        color: var(--muted);
+    }
+
+    .fc-event {
+        border-radius: 4px !important;
+        border: none !important;
+        font-size: 12px !important;
+        font-weight: 500;
+        cursor: pointer;
+    }
+
+    .fc-event .fc-event-title {
+        font-weight: 500;
+    }
+
+    .fc-event .fc-event-time {
+        font-size: 11px;
+        opacity: .85;
+    }
+
+    /* Slot hover highlight */
+    .fc .fc-highlight { background: var(--accent-light) !important; }
+
+    /* Modal */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.35);
+        z-index: 200;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .modal-box {
+        background: var(--surface);
+        border-radius: var(--radius);
+        box-shadow: 0 8px 32px rgba(0,0,0,.18);
+        width: 100%;
+        max-width: 480px;
+        display: flex;
+        flex-direction: column;
+        animation: modal-in .15s ease;
+    }
+
+    @keyframes modal-in {
+        from { opacity: 0; transform: translateY(-8px) scale(.98); }
+        to   { opacity: 1; transform: none; }
+    }
+
+    .modal-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 18px 20px 14px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .modal-title {
+        font-size: 15px;
+        font-weight: 600;
+        color: var(--text);
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: var(--muted);
+        padding: 4px;
+        border-radius: 4px;
+        display: flex;
+        transition: color .14s;
+    }
+    .modal-close:hover { color: var(--text); }
+    .modal-close svg { width: 18px; height: 18px; }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+    .modal-footer {
+        padding: 14px 20px;
+        border-top: 1px solid var(--border);
+        display: flex;
+    }
+
+    /* Compact form-group inside modal */
+    .modal-body .form-group { margin-bottom: 14px; }
+    .modal-body .form-group:last-child { margin-bottom: 0; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const CSRF = '{{ csrf_token }}';
+    const JSON_URL  = '{% url "appointment_json" %}';
+    const CREATE_URL = '{% url "appointment_create" %}';
+    const DELETE_BASE = '/appointments/';  // + id + /delete/
+
+    // ── Modal elements ──────────────────────────────────────────────────────
+    const overlay    = document.getElementById('appt-modal-overlay');
+    const modalTitle = document.getElementById('modal-title');
+    const apptIdEl   = document.getElementById('modal-appt-id');
+    const dateEl     = document.getElementById('modal-datetime');
+    const patientEl  = document.getElementById('modal-patient');
+    const durationEl = document.getElementById('modal-duration');
+    const reasonEl   = document.getElementById('modal-reason');
+    const statusEl   = document.getElementById('modal-status');
+    const notesEl    = document.getElementById('modal-notes');
+    const saveBtn    = document.getElementById('modal-save-btn');
+    const cancelBtn  = document.getElementById('modal-cancel-btn');
+    const deleteBtn  = document.getElementById('modal-delete-btn');
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+    function toLocalInput(date) {
+        // Convert Date to datetime-local string in local time
+        const pad = n => String(n).padStart(2, '0');
+        return `${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    }
+
+    function openModal(opts = {}) {
+        apptIdEl.value   = opts.id || '';
+        dateEl.value     = opts.datetime || '';
+        patientEl.value  = opts.patient_id || '';
+        durationEl.value = opts.duration || '30';
+        reasonEl.value   = opts.reason || '';
+        statusEl.value   = opts.status || 'scheduled';
+        notesEl.value    = opts.notes || '';
+        modalTitle.textContent = opts.id ? 'Edit Appointment' : 'Schedule Appointment';
+        saveBtn.textContent    = opts.id ? 'Save Changes' : 'Schedule';
+        deleteBtn.style.display = opts.id ? 'block' : 'none';
+        overlay.style.display = 'flex';
+        patientEl.focus();
+    }
+
+    function closeModal() {
+        overlay.style.display = 'none';
+    }
+
+    // ── FullCalendar ─────────────────────────────────────────────────────────
+    const calEl = document.getElementById('calendar');
+
+    const calendar = new FullCalendar.Calendar(calEl, {
+        initialView: 'timeGridWeek',
+        headerToolbar: {
+            left:   'prev,next today',
+            center: 'title',
+            right:  'dayGridMonth,timeGridWeek,timeGridDay',
+        },
+        buttonText: {
+            today: 'Today',
+            month: 'Month',
+            week:  'Week',
+            day:   'Day',
+        },
+        height: 'calc(100vh - 160px)',
+        slotMinTime: '07:00:00',
+        slotMaxTime: '20:00:00',
+        slotDuration: '00:15:00',
+        slotLabelInterval: '01:00:00',
+        allDaySlot: false,
+        nowIndicator: true,
+        selectable: true,
+        selectMirror: true,
+        eventSources: [{
+            url: JSON_URL,
+            method: 'GET',
+            extraParams: {},
+            failure: function() { console.error('Failed to load appointments'); },
+        }],
+
+        // Click empty slot → open modal pre-filled with that time
+        dateClick: function(info) {
+            openModal({ datetime: toLocalInput(info.date) });
+        },
+
+        // Drag-select a range → open modal with start time + duration
+        select: function(info) {
+            const diffMs   = info.end - info.start;
+            const diffMins = Math.round(diffMs / 60000);
+            const durations = [10, 15, 30, 45, 60, 90, 120, 180];
+            // Snap to nearest option
+            const closest = durations.reduce((a, b) =>
+                Math.abs(b - diffMins) < Math.abs(a - diffMins) ? b : a);
+            openModal({
+                datetime: toLocalInput(info.start),
+                duration: String(closest),
+            });
+            calendar.unselect();
+        },
+
+        // Click existing event → open edit modal
+        eventClick: function(info) {
+            const p = info.event.extendedProps;
+            openModal({
+                id:         info.event.id,
+                datetime:   toLocalInput(info.event.start),
+                patient_id: p.patient_id,
+                duration:   String(p.duration || 30),
+                reason:     p.reason,
+                status:     p.status,
+                notes:      p.notes,
+            });
+        },
+
+        // Drag to reschedule
+        editable: true,
+        eventDrop: function(info) {
+            const diffMs   = info.event.end ? (info.event.end - info.event.start) : null;
+            const duration = diffMs ? Math.round(diffMs / 60000) : info.event.extendedProps.duration;
+            patchAppointment(info.event.id, {
+                appointment_date: info.event.start.toISOString(),
+                duration_minutes: duration,
+            }).catch(() => info.revert());
+        },
+
+        // Resize to change duration
+        eventResize: function(info) {
+            const diffMs   = info.event.end - info.event.start;
+            const duration = Math.round(diffMs / 60000);
+            patchAppointment(info.event.id, {
+                duration_minutes: duration,
+            }).catch(() => info.revert());
+        },
+    });
+
+    calendar.render();
+
+    // ── API calls ────────────────────────────────────────────────────────────
+    async function saveAppointment() {
+        const id = apptIdEl.value;
+
+        if (!patientEl.value) { patientEl.focus(); return; }
+        if (!dateEl.value)    { dateEl.focus();    return; }
+        if (!reasonEl.value)  { reasonEl.focus();  return; }
+
+        // Convert local datetime-input value to ISO
+        const localDate = new Date(dateEl.value);
+
+        const payload = {
+            patient:          patientEl.value,
+            appointment_date: localDate.toISOString(),
+            duration_minutes: durationEl.value,
+            reason:           reasonEl.value,
+            status:           statusEl.value,
+            notes:            notesEl.value,
+        };
+
+        const url    = id ? `/appointments/${id}/edit/` : CREATE_URL;
+        const method = 'POST';
+
+        const resp = await fetch(url, {
+            method,
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF,
+            },
+            body: JSON.stringify(payload),
+        });
+
+        if (resp.ok) {
+            closeModal();
+            calendar.refetchEvents();
+        } else {
+            alert('Error saving appointment. Please try again.');
+        }
+    }
+
+    async function patchAppointment(id, data) {
+        const resp = await fetch(`/appointments/${id}/edit/`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': CSRF,
+            },
+            body: JSON.stringify(data),
+        });
+        if (!resp.ok) throw new Error('patch failed');
+    }
+
+    async function deleteAppointment() {
+        const id = apptIdEl.value;
+        if (!id) return;
+        if (!confirm('Delete this appointment?')) return;
+
+        const resp = await fetch(`/appointments/${id}/delete/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': CSRF },
+            body: new URLSearchParams({ csrfmiddlewaretoken: CSRF }),
+        });
+
+        // Delete view redirects on success; treat any non-5xx as ok
+        if (resp.ok || resp.redirected) {
+            closeModal();
+            calendar.refetchEvents();
+        } else {
+            alert('Error deleting appointment.');
+        }
+    }
+
+    // ── Event listeners ───────────────────────────────────────────────────────
+    saveBtn.addEventListener('click',   saveAppointment);
+    cancelBtn.addEventListener('click', closeModal);
+    deleteBtn.addEventListener('click', deleteAppointment);
+    document.getElementById('modal-close-btn').addEventListener('click', closeModal);
+
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeModal();
+    });
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeModal();
+    });
+});
+</script>
+
+{% endblock %}

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block title %}Users — ClearChart{% endblock %}
+{% block nav_users %}active{% endblock %}
+{% block topbar_title %}Users{% endblock %}
+
+{% block topbar_actions %}
+    <a href="{% url 'user_create' %}" class="btn btn-primary btn-sm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:13px;height:13px;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add User
+    </a>
+{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <div>
+        <h1>Users</h1>
+        <div class="subtitle">{{ users|length }} user{{ users|length|pluralize }}</div>
+    </div>
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Access Level</th>
+                <th>Admin</th>
+                <th>Last Login</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for u in users %}
+            <tr>
+                <td style="font-weight:500;">
+                    {% if u.get_full_name %}
+                        {{ u.get_full_name }}
+                    {% else %}
+                        <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+
+                <td class="font-mono text-sm">{{ u.username }}</td>
+
+                <td class="text-muted text-sm">{{ u.email|default:"—" }}</td>
+
+                <td>
+                    {% if u.userprofile.role == "front_desk_volunteer" %}
+                        <span class="badge badge-gray">Front Desk Volunteer</span>
+                    {% elif u.userprofile.role == "undergrad_staff" %}
+                        <span class="badge badge-blue">Undergrad Staff (Vitals/Lab)</span>
+                    {% elif u.userprofile.role == "student_practitioner" %}
+                        <span class="badge badge-orange">Student Practitioner / Scribe</span>
+                    {% elif u.userprofile.role == "attending_faculty" %}
+                        <span class="badge badge-green">Attending Faculty (Preceptor)</span>
+                    {% else %}
+                        <span class="text-muted text-sm">—</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    {% if u.userprofile.is_admin %}
+                        <span class="badge badge-red">Admin</span>
+                    {% else %}
+                        <span class="text-muted text-sm">—</span>
+                    {% endif %}
+                </td>
+
+                <td class="text-muted text-sm font-mono">
+                    {{ u.last_login|date:"M d, Y"|default:"Never" }}
+                </td>
+
+                <td>
+                    <a href="{% url 'user_edit' u.id %}" class="btn btn-ghost btn-sm">Edit</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7">
+                    <div class="empty-state"><p>No users found.</p></div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% endblock %}

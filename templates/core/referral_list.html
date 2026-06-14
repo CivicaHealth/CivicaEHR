@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+
+{% block title %}Referrals — ClearChart{% endblock %}
+{% block nav_referrals %}active{% endblock %}
+{% block topbar_title %}Referrals{% endblock %}
+
+{% block content %}
+
+<div class="page-header">
+    <h1>Referrals</h1>
+</div>
+
+<!-- Status tabs -->
+<div style="display:flex; gap:2px; margin-bottom:20px; border-bottom:1px solid var(--border);">
+
+    <a href="{% url 'referral_list' %}"
+       class="tab-link {% if not status_filter %}tab-active{% endif %}">
+        All <span class="tab-count">{{ counts.all }}</span>
+    </a>
+
+    <a href="?status=pending"
+       class="tab-link {% if status_filter == 'pending' %}tab-active{% endif %}">
+        Pending <span class="tab-count">{{ counts.pending }}</span>
+    </a>
+
+    <a href="?status=sent"
+       class="tab-link {% if status_filter == 'sent' %}tab-active{% endif %}">
+        Sent <span class="tab-count">{{ counts.sent }}</span>
+    </a>
+
+    <a href="?status=completed"
+       class="tab-link {% if status_filter == 'completed' %}tab-active{% endif %}">
+        Completed <span class="tab-count">{{ counts.completed }}</span>
+    </a>
+
+    <a href="?status=cancelled"
+       class="tab-link {% if status_filter == 'cancelled' %}tab-active{% endif %}">
+        Cancelled <span class="tab-count">{{ counts.cancelled }}</span>
+    </a>
+
+</div>
+
+<div class="card">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Created</th>
+                <th>Patient</th>
+                <th>Specialist</th>
+                <th>Specialty</th>
+                <th>Status</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for referral in referrals %}
+            <tr>
+                <td class="font-mono text-sm" style="white-space:nowrap;">
+                    {{ referral.created_at|date:"M d, Y" }}<br>
+                    <span class="text-muted">{{ referral.created_at|date:"g:i A" }}</span>
+                </td>
+
+                <td>
+                    <a href="{% url 'patient_detail' referral.patient.id %}"
+                       style="color:var(--text); font-weight:500;">
+                        {{ referral.patient }}
+                    </a><br>
+                    <span style="font-size:11px; color:var(--muted); font-family:'DM Mono',monospace;">#{{ referral.patient.id }}</span>
+                </td>
+
+                <td style="font-weight:500;">{{ referral.specialist_name }}</td>
+                <td class="text-muted">{{ referral.specialty|default:"—" }}</td>
+
+                <td>
+                    {% if referral.status == "pending" %}
+                        <span class="badge badge-gray">Pending</span>
+                    {% elif referral.status == "sent" %}
+                        <span class="badge badge-blue">Sent</span>
+                    {% elif referral.status == "completed" %}
+                        <span class="badge badge-green">Completed</span>
+                    {% elif referral.status == "cancelled" %}
+                        <span class="badge badge-red">Cancelled</span>
+                    {% endif %}
+                </td>
+
+                <td>
+                    <a href="{% url 'referral_edit' referral.id %}"
+                       class="btn btn-ghost btn-sm">Edit</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="6">
+                    <div class="empty-state">
+                        <p>No referrals found{% if status_filter %} with status <strong>{{ status_filter }}</strong>{% endif %}.</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<style>
+    .tab-link {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        text-decoration: none;
+        border-bottom: 2px solid transparent;
+        margin-bottom: -1px;
+        transition: color .14s;
+    }
+    .tab-link:hover { color: var(--text); }
+    .tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab-count {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 20px;
+        height: 18px;
+        padding: 0 5px;
+        background: var(--bg);
+        border-radius: 9px;
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--muted);
+    }
+    .tab-active .tab-count { background: var(--accent-light); color: var(--accent); }
+</style>
+
+{% endblock %}
