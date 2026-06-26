@@ -1,15 +1,25 @@
 import type { ButtonHTMLAttributes, InputHTMLAttributes, LabelHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes, HTMLAttributes } from 'react';
 
-export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & { variant?: 'primary' | 'secondary' | 'danger' | 'ghost' };
+export type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+  loading?: boolean;
+};
 
-export function Button({ variant = 'primary', className = '', ...props }: ButtonProps) {
+export function Button({ variant = 'primary', loading = false, disabled, className = '', ...props }: ButtonProps) {
   const variants = {
     primary: 'bg-teal-600 text-white hover:bg-teal-500',
     secondary: 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50',
     danger: 'bg-red-600 text-white hover:bg-red-500',
     ghost: 'bg-transparent text-slate-700 hover:bg-slate-100',
   };
-  return <button className={`inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`} {...props} />;
+  return (
+    <button
+      className={`inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${variants[variant]} ${className}`}
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      {...props}
+    />
+  );
 }
 
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {
