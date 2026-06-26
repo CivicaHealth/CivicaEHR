@@ -1,0 +1,120 @@
+EMR <-> Patient Portal Workflow Plan
+=====================================
+
+Context
+-------
+The Patient Portal is a patient-facing tool, separate from the doctor-facing
+EMR, but both need to operate on the same underlying clinical data. This plan
+describes how a patient gets an account, how EMR data becomes visible to a
+patient, and how messaging works between patients and clinic staff.
+
+Current state (as of writing):
+- ROLE_NAMES (packages/permissions/src/roles.ts) = platform_admin, clinic_admin, member
+- tool_registry "patient-portal" entry has requiredRoles: ['clinic_admin'] (wrong --
+  needs to be patient-accessible)
+- EMR tenant schema (packages/db/src/tenant/schema/emr.ts) has emr_patients,
+  emr_encounters, emr_soap_notes, emr_vitals, emr_diagnoses, emr_medications,
+  emr_allergies, emr_problems, emr_lab_orders, emr_referrals, emr_social_history,
+  emr_appointments. No "shared with patient" concept yet, no portal messages table.
+
+
+1. New role: "patient"
+-----------------------
+- Add 'patient' to ROLE_NAMES.
+- Update tool_registry seed: patient-portal.requiredRoles = ['patient'].
+- canAccessTool: a 'patient' membership should only ever grant access to the
+  patient-portal tool (never EMR/Inventory/Roster/Billing/Admin).
+
+
+2. Identity linkage: login <-> EMR chart
+-----------------------------------------
+A logged-in patient (control DB `users` row) must map to a specific
+`emr_patients` row (tenant DB). New control-DB table `patient_links`:
+
+    patient_links: id, userId, clinicId, emrPatientId, createdAt
+
+Flow:
+- Patient registers via existing clinic-code flow -> gets a `pending`
+  clinic_membership with roleName='patient'.
+- A staff member (front desk / clinic admin) reviews pending patient
+  memberships, matches the person to an existing emr_patients record (or
+  creates one), and creates the patient_links row + flips membership status
+  to 'active'.
+- This linking step is the trust boundary: it is the only place a login
+  becomes tied to a chart. All portal queries derive emrPatientId from
+  patient_links for the current session -- never from client-supplied input.
+
+
+3. EMR -> Portal data flow: shared tables, not a copy
+-------------------------------------------------------
+The portal does not get a duplicated copy of clinical data. It reads the same
+tenant tables EMR writes to (emr_encounters, emr_lab_orders, emr_medications,
+emr_soap_notes, etc.), scoped by:
+
+    WHERE emrPatientId = <patient_links.emrPatientId for current user>
+
+Every portal query is also an IDOR check -- the emrPatientId always comes from
+the server-side link lookup, never from the request.
+
+
+4. "Sending" data to the patient = a release flag
+----------------------------------------------------
+Not everything in a chart should be auto-visible (draft notes, pending labs).
+Add a boolean column `sharedWithPatient` (default false) to the tables that
+should ever reach the portal -- candidates:
+  - emr_lab_orders
+  - emr_encounters / emr_soap_notes (visit summaries)
+  - future emr_documents table
+
+EMR UI gets a "Share with patient" action on these records. Flipping the flag
+is the actual "send to portal" moment and must call:
+
+    logAuditEvent({ action: 'RECORD_SHARED_WITH_PATIENT', ... })
+
+Portal queries always add `AND sharedWithPatient = true` to the WHERE clause
+above.
+
+
+5. Messaging
+------------
+New tenant table `portal_messages`:
+
+    portal_messages: id, emrPatientId, senderUserId, senderRole ('patient'|'staff'),
+                      body, createdAt, readAt
+
+- EMR gets a per-patient message thread tab (staff view).
+- Patient portal gets an inbox/thread view.
+- Both read/write the same table, scoped by emrPatientId.
+- Sending a message logs PORTAL_MESSAGE_SENT.
+
+
+6. Patient portal pages
+------------------------
+apps/dashboard/src/app/(tools)/patient-portal/ -- own pages, distinct from EMR
+staff views, same auth/session/layout pattern as other tools:
+
+  - Overview: upcoming appointments, recently shared results
+  - Records: encounters / labs / meds / allergies where sharedWithPatient = true
+  - Messages: thread with clinic staff
+  - Profile: demographics (read-only or limited self-edit)
+
+Each page: getCurrentUser() -> redirect /login if null, look up patient_links
+for emrPatientId, canAccessTool() check, then scoped queries as in section 3.
+
+
+7. New audit actions
+---------------------
+Add to packages/audit/src/actions.ts:
+  - PATIENT_LINK_CREATED
+  - RECORD_SHARED_WITH_PATIENT
+  - PORTAL_MESSAGE_SENT
+
+
+Implementation order
+---------------------
+1. Role + tool_registry fix (patient role, patient-portal requiredRoles)
+2. patient_links table + migration, staff-side linking UI
+3. sharedWithPatient columns + migration, EMR "share" actions
+4. portal_messages table + migration
+5. Patient portal pages (overview, records, messages, profile)
+6. Audit actions wired into all of the above

@@ -1,0 +1,1 @@
+{"name":"@civica/auth","version":"0.1.0","private":true,"type":"module","exports":{".":"./src/index.ts"},"dependencies":{"@civica/db":"*","@civica/types":"*","argon2":"^0.44.0"}}

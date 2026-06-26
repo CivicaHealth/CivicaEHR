@@ -1,0 +1,32 @@
+{
+  "name": "civica-ecosystem-dev",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @civica/dashboard",
+    "build": "npm run build -w @civica/dashboard",
+    "lint": "npm run lint -w @civica/dashboard",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d db && npm run db:seed",
+    "db:seed": "tsx packages/db/src/scripts/seed-dev.ts",
+    "dev:setup": "npm install && npm run db:up && npm run db:seed",
+    "dev:all": "npm run db:up && npm run db:seed && npm run dev"
+  },
+  "dependencies": {
+    "argon2": "^0.44.0",
+    "drizzle-orm": "^0.45.2",
+    "nanoid": "^5.1.6",
+    "nodemailer": "^7.0.11",
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.6",
+    "tsx": "^4.21.0",
+    "typescript": "^5"
+  }
+}

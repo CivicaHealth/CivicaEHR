@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+/* @civica/ui is a workspace package outside this app's default scan root —
+   include it explicitly so its Tailwind classes are generated. */
+@source "../../../../packages/ui/src";
+
+:root {
+  --navy: #1a2535;
+  --navy-mid: #243044;
+  --navy-light: #2e3d55;
+  --slate: #4a5c72;
+  --text-secondary: #5a6a7e;
+  --muted: #8496ab;
+  --border: #dce3ec;
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --accent: #2d8c92;
+  --accent-light: #e3f4f3;
+  --brand-orange: #ed8c5c;
+  --brand-teal: #5ec4b6;
+  --background: var(--bg);
+  --foreground: var(--navy);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-dm-sans);
+  --font-mono: var(--font-dm-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  letter-spacing: 0;
+}
+
+::selection {
+  background: var(--accent-light);
+  color: var(--navy);
+}
+
+/* FullCalendar overrides — match Civica UI tokens */
+.fc-civica .fc {
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-size: 13px;
+}
+
+.fc-civica .fc .fc-toolbar-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--navy);
+}
+
+.fc-civica .fc .fc-button {
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  box-shadow: none;
+  padding: 6px 13px;
+  border-radius: 6px !important;
+  transition: all 0.14s;
+}
+
+.fc-civica .fc .fc-button:hover,
+.fc-civica .fc .fc-button:focus {
+  background: var(--bg);
+  color: var(--navy);
+  border-color: var(--muted);
+  box-shadow: none !important;
+  outline: none;
+}
+
+.fc-civica .fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc-civica .fc .fc-button-primary:not(:disabled):active {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+.fc-civica .fc .fc-button-group .fc-button {
+  border-radius: 0 !important;
+}
+.fc-civica .fc .fc-button-group .fc-button:first-child {
+  border-radius: 6px 0 0 6px !important;
+}
+.fc-civica .fc .fc-button-group .fc-button:last-child {
+  border-radius: 0 6px 6px 0 !important;
+}
+
+.fc-civica .fc .fc-today-button {
+  border-radius: 6px !important;
+}
+
+.fc-civica .fc-theme-standard td,
+.fc-civica .fc-theme-standard th,
+.fc-civica .fc-theme-standard .fc-scrollgrid {
+  border-color: var(--border);
+}
+
+.fc-civica .fc .fc-col-header-cell-cushion {
+  font-size: 11.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 8px 4px;
+}
+
+.fc-civica .fc .fc-daygrid-day-number {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  padding: 6px 8px;
+}
+
+.fc-civica .fc .fc-day-today {
+  background: var(--accent-light) !important;
+}
+
+.fc-civica .fc .fc-day-today .fc-daygrid-day-number {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.fc-civica .fc .fc-timegrid-slot-label-cushion {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.fc-civica .fc-event {
+  border-radius: 4px !important;
+  border: none !important;
+  font-size: 12px !important;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.fc-civica .fc-event .fc-event-title {
+  font-weight: 500;
+}
+
+.fc-civica .fc-event .fc-event-time {
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.fc-civica .fc .fc-highlight {
+  background: var(--accent-light) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
